@@ -16,6 +16,8 @@ import FieldTasks from './pages/FieldTasks.jsx';
 import Analytics from './pages/Analytics.jsx';
 import DataPage from './pages/DataPage.jsx';
 import Admin from './pages/Admin.jsx';
+import Zones from './pages/Zones.jsx';
+import Governance from './pages/Governance.jsx';
 import Methodology from './pages/Methodology.jsx';
 
 function Protected({ children, roles }) {
@@ -31,7 +33,8 @@ function Home() {
   return user?.role === 'field_officer' ? <Navigate to="/app/field" replace /> : <Dashboard />;
 }
 
-const STAFF = ['admin', 'analyst'];
+const STAFF = ['admin', 'analyst', 'planner', 'auditor']; // everyone except field officers
+const FIELD = ['admin', 'analyst', 'field_officer'];
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -47,7 +50,9 @@ createRoot(document.getElementById('root')).render(
               <Route path="alerts" element={<Protected roles={STAFF}><Alerts /></Protected>} />
               <Route path="alerts/:id" element={<AlertDetail />} />
               <Route path="cells/:id" element={<CellDetail />} />
-              <Route path="field" element={<FieldTasks />} />
+              <Route path="field" element={<Protected roles={FIELD}><FieldTasks /></Protected>} />
+              <Route path="zones" element={<Protected roles={STAFF}><Zones /></Protected>} />
+              <Route path="governance" element={<Protected roles={STAFF}><Governance /></Protected>} />
               <Route path="analytics" element={<Protected roles={STAFF}><Analytics /></Protected>} />
               <Route path="data" element={<Protected roles={STAFF}><DataPage /></Protected>} />
               <Route path="admin" element={<Protected roles={['admin']}><Admin /></Protected>} />

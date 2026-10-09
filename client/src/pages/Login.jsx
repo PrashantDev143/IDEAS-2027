@@ -5,10 +5,11 @@ import { Logo } from '../components/Layout.jsx';
 import { ErrorBox } from '../components/ui.jsx';
 
 const DEMO = [
-  ['admin@econoscope.in', 'admin123', 'Administrator', 'Full access, users, settings, data ingest'],
-  ['analyst@econoscope.in', 'analyst123', 'Analyst', 'Triage alerts, assign field teams, run engine'],
-  ['field.north@econoscope.in', 'field123', 'Field officer · North Goa', 'Assigned validations'],
-  ['field.south@econoscope.in', 'field123', 'Field officer · South Goa', 'Assigned validations'],
+  ['admin@econoscope.in', 'admin123', 'Administrator', 'Everything, plus users, settings, sign-off for sensitive zones'],
+  ['analyst@econoscope.in', 'analyst123', 'Policy analyst', 'Rank zones, assign field teams, export validation lists'],
+  ['field.north@econoscope.in', 'field123', 'Field validation officer', 'Own visit list and outcome form only'],
+  ['planner@econoscope.in', 'planner123', 'Planner / formalisation lead', 'Read-only view, plus outreach referrals'],
+  ['auditor@econoscope.in', 'auditor123', 'Auditor', 'Read-only view, audit log, bias and coverage review'],
 ];
 
 export default function Login() {
@@ -36,8 +37,7 @@ export default function Login() {
         <div>
           <h1 style={{ fontSize: 40, marginBottom: 14 }}>Detect. Explain. <span style={{ color: 'var(--amber)' }}>Validate.</span></h1>
           <p className="muted" style={{ maxWidth: 460, fontSize: 15 }}>
-            Every alert says where observed activity differs from official records, how confident the model is, and which independent signals agree.
-            Field teams then confirm or reject it on the ground.
+            Every flag says which zone differs from its peers, why, and how sure the model is. Field teams then check on the ground. It never names a business or a person.
           </p>
         </div>
         <p className="small muted">IDEAS 5.0 · Team Chakravyuh · PCCE Goa</p>

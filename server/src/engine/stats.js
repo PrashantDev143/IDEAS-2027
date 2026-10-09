@@ -75,3 +75,39 @@ export function seasonalIndex(series, calMonths) {
   f = f.map((x) => x / avg);
   return f;
 }
+
+export function mulberry32(seed) {
+  return function () {
+    seed |= 0; seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export const sd = (a) => {
+  if (a.length < 2) return 0;
+  const m = mean(a);
+  return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1));
+};
+
+// Robust ridge regression: ordinary ridge, then Huber-style reweighting so a few anomalous zones
+// cannot drag the "expected" line towards themselves.
+export function robustRidge(X, y, lambda = 1e-2, iters = 2) {
+  let w = new Array(y.length).fill(1);
+  let fit = null;
+  for (let it = 0; it <= iters; it++) {
+    const Xw = X.map((r, i) => r.map((v) => v * Math.sqrt(w[i])));
+    const yw = y.map((v, i) => v * Math.sqrt(w[i]));
+    fit = ridge(Xw, yw, lambda);
+    const res = X.map((r, i) => y[i] - dot(r, fit.beta));
+    const { z, scale } = robustZ(res, 0.05);
+    fit.scale = scale;
+    fit.residuals = res;
+    w = z.map((v) => (Math.abs(v) <= 1.5 ? 1 : 1.5 / Math.abs(v)));
+  }
+  const ym = mean(y);
+  const ssTot = y.reduce((s, v) => s + (v - ym) ** 2, 0) || 1;
+  fit.r2 = 1 - fit.residuals.reduce((s, v) => s + v * v, 0) / ssTot;
+  return fit;
+}

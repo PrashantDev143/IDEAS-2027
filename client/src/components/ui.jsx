@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, createContext, useContext } from 'react';
 import { api } from '../lib/api.js';
-import { TYPE_META, STATUS_META, num } from '../lib/format.js';
+import { TYPE_META, STATUS_META, TIER_META, SPATIAL_META, TREND_META, confBand, num } from '../lib/format.js';
 
 export function useApi(path, deps = []) {
   const [state, setState] = useState({ data: null, error: null, loading: true });
@@ -20,7 +20,16 @@ export const Loading = ({ label = 'Loading…' }) => (
 export const ErrorBox = ({ children }) => (children ? <div className="error-box" role="alert">{children}</div> : null);
 export const Empty = ({ children }) => <div className="empty">{children}</div>;
 
-export const PriorityBadge = ({ p }) => <span className={`badge p-${p}`}><span className="dot" />{p === 'high' ? 'High' : p === 'medium' ? 'Medium' : 'Low'}</span>;
+const Chip = ({ color, label, title, dot = true }) => (
+  <span className="badge" style={{ color, borderColor: 'currentColor' }} title={title}>{dot && <span className="dot" />}{label}</span>
+);
+// validation priority tier (also used for flags)
+export const TierBadge = ({ t }) => (t ? <Chip color={TIER_META[t]?.color === '#3d6f8f' ? '#8fbbd6' : t === 'insufficient' ? '#b4b6c2' : TIER_META[t]?.color} label={TIER_META[t]?.label || t} title="Validation priority tier" /> : null);
+export const PriorityBadge = ({ p }) => <TierBadge t={p} />;
+export const SpatialBadge = ({ c }) => (c ? <Chip color={c === 'ns' ? '#8a8c9a' : c === 'cold' ? '#56B4E9' : SPATIAL_META[c]?.color} label={SPATIAL_META[c]?.label || c} title={SPATIAL_META[c]?.desc} /> : null);
+export const TrendBadge = ({ t }) => (t && t !== 'none' ? <Chip color={TREND_META[t]?.color} label={TREND_META[t]?.label || t} title="Change-point analysis of the gap" dot={false} /> : null);
+export const SensitiveBadge = () => <Chip color="#CC79A7" label="Sensitive zone" title="Insecure tenure / informal settlement: a field visit needs senior sign-off" dot={false} />;
+export const BandLabel = ({ value }) => { const b = confBand(value); return b ? <span className="small muted">{b} confidence</span> : null; };
 export const StatusBadge = ({ s }) => <span className={`badge s-${s}`}>{STATUS_META[s]?.label || s}</span>;
 export const TypeBadge = ({ t }) => (
   <span className="badge" style={{ color: TYPE_META[t]?.color, borderColor: 'currentColor' }} title={TYPE_META[t]?.desc}>

@@ -27,8 +27,8 @@ export default function Landing() {
         <div>
           <h1>See where the economy is <em>growing, shrinking or missing</em> from the records.</h1>
           <p className="lead">
-            EconoScope compares official business records with what satellites, tourism data and infrastructure show on the ground.
-            It then points field teams to the places worth checking.
+            EconoScope compares official business records with what satellites, tourism data and infrastructure show on the ground, zone by zone.
+            Every flag comes with a reason and a confidence score, and it never points at an individual business.
           </p>
           <div className="row" style={{ gap: 12 }}>
             <Link to={appLink} className="btn primary">{user ? 'Open the portal →' : 'Sign in to the portal →'}</Link>
@@ -36,9 +36,9 @@ export default function Landing() {
           </div>
           {preview && (
             <div className="row" style={{ gap: 32, marginTop: 34 }}>
-              <div><div className="l-stat" style={{ fontSize: 30 }}>{preview.stats.cells}</div><div className="small muted">areas monitored monthly</div></div>
-              <div><div className="l-stat" style={{ fontSize: 30, color: 'var(--amber)' }}>7</div><div className="small muted">data sources combined</div></div>
-              <div><div className="l-stat" style={{ fontSize: 30, color: 'var(--teal)' }}>{preview.stats.open_alerts}</div><div className="small muted">areas flagged for checking</div></div>
+              <div><div className="l-stat" style={{ fontSize: 30 }}>{preview.stats.cells}</div><div className="small muted">zones monitored monthly</div></div>
+              <div><div className="l-stat" style={{ fontSize: 30, color: 'var(--amber)' }}>8</div><div className="small muted">data sources combined</div></div>
+              <div><div className="l-stat" style={{ fontSize: 30, color: 'var(--teal)' }}>{preview.stats.open_alerts}</div><div className="small muted">zones flagged for a closer look</div></div>
             </div>
           )}
         </div>
@@ -52,7 +52,7 @@ export default function Landing() {
             <span className="small muted">Goa, latest month · demo data</span>
             <div className="seg">
               <button className={layer === 'eai' ? 'on' : ''} onClick={() => setLayer('eai')}>Activity</button>
-              <button className={layer === 'gap_z' ? 'on' : ''} onClick={() => setLayer('gap_z')}>Gap vs records</button>
+              <button className={layer === 'gap_z' ? 'on' : ''} onClick={() => setLayer('gap_z')}>Gap vs peers</button>
             </div>
           </div>
         </div>
@@ -62,9 +62,9 @@ export default function Landing() {
         <h2 className="l-title">How it works</h2>
         <p className="muted" style={{ maxWidth: 680, marginBottom: 28 }}>Three steps, repeated every month.</p>
         <div className="grid g3">
-          {[['1', 'var(--amber)', 'Combine the data', 'Business registrations and survey counts are combined with night-time satellite lights, built-up area, digital payments, power connections and tourism figures, for every 2.7 km area of Goa.'],
-            ['2', 'var(--teal)', 'Compare with the records', 'The model estimates how much activity is really there and compares it with what the official records say. Areas that are very different, or changing unusually fast, are flagged.'],
-            ['3', 'var(--orange)', 'Check on the ground', 'Each flag comes with its evidence and a confidence score. Analysts send field teams to the most important ones, and what they find is fed back to improve the model.']].map(([n, c, t, d]) => (
+          {[['1', 'var(--amber)', 'Combine the data', 'Business registrations and survey counts are combined with night-time satellite lights, built-up area and tourism figures, added up to ~2.7 km zones across Goa.'],
+            ['2', 'var(--teal)', 'Compare with the records', 'Each zone is compared only with zones of the same kind. The model works out what should be on record there and flags zones that sit far from their peers, or are changing unusually fast.'],
+            ['3', 'var(--orange)', 'Check on the ground', 'Each flag carries its evidence and a confidence score. Field teams visit the top zones and a random control set, offer registration support, and their findings recalibrate the model.']].map(([n, c, t, d]) => (
             <div key={n} className="l-card">
               <div className="pill-num" style={{ background: c }}>{n}</div>
               <h3 style={{ font: '700 19px var(--serif)', margin: '16px 0 8px' }}>{t}</h3>
@@ -77,7 +77,7 @@ export default function Landing() {
       <section className="l-section" id="model">
         <h2 className="l-title">What the model does</h2>
         <p className="muted" style={{ maxWidth: 720, marginBottom: 28 }}>
-          In plain words: it works out how much economic activity each area really has, compares that with the official records, and tells you where the two disagree. It also says how sure it is.
+          In plain words: it works out how many businesses should be on record in each zone, given what can be observed there and in similar zones, and tells you where the records fall short or run ahead. It also says how sure it is.
         </p>
         <ModelExplainer />
       </section>

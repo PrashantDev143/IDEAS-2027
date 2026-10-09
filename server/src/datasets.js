@@ -1,26 +1,36 @@
-import { db, run, all, tx, listMonths } from './db.js';
+import { db, run, all, get, tx, listMonths } from './db.js';
 import { buildCells, generateMonth, surveyEstimate, monthIndex, monthLabel } from './sim/generator.js';
 
+// role: which side of the comparison the layer feeds. priority: P0 = MVP, P2 = optional enrichment.
 export const DATASETS = [
-  { key: 'registered', name: 'Business registrations', category: 'official', source: 'Udyam / GST / Shops & Establishments registers (aggregated)', unit: 'registered units', frequency: 'Monthly', description: 'Active registered establishments located in each cell. Forms the official-records side of the comparison.' },
-  { key: 'survey_estimate', name: 'Survey baseline (ASUSE-style)', category: 'official', source: 'Annual Survey of Unincorporated Sector Enterprises, modelled to cell level', unit: 'establishments', frequency: 'Annual (FY)', description: 'Annual establishment estimate. Used to train the signal-to-activity nowcast model.' },
-  { key: 'night_light', name: 'Night-time lights', category: 'satellite', source: 'VIIRS Day/Night Band monthly composites', unit: 'nW/cm²/sr', frequency: 'Monthly', description: 'Mean night-time radiance. A strong proxy for commercial and residential intensity.' },
-  { key: 'built_up', name: 'Built-up surface index', category: 'satellite', source: 'Sentinel-2 derived built-up classification', unit: '% of cell', frequency: 'Monthly', description: 'Share of cell area classified as built-up surface.' },
-  { key: 'digital_points', name: 'Digital merchant payment points', category: 'digital', source: 'Aggregated merchant QR / POS counts (authorised, anonymised)', unit: 'active points', frequency: 'Monthly', description: 'Count of active merchant payment acceptance points. No transaction or personal data.' },
-  { key: 'power_connections', name: 'Commercial power connections', category: 'infrastructure', source: 'Electricity Department, commercial tariff connections', unit: 'connections', frequency: 'Monthly', description: 'Live commercial/LT-II tariff connections in each cell.' },
-  { key: 'listings', name: 'Hospitality listings', category: 'tourism', source: 'Department of Tourism registrations + public listing aggregates', unit: 'listings', frequency: 'Monthly', description: 'Hotels, guest houses, homestays and rental listings active in the month.' },
-  { key: 'footfall', name: 'Tourist footfall', category: 'tourism', source: 'Department of Tourism arrivals, spatially apportioned', unit: 'visitors / month', frequency: 'Monthly', description: 'Estimated tourist visits. Statewide totals are calibrated to ~1 crore annual arrivals.' },
+  { key: 'registered', name: 'Registered footprint', category: 'official', role: 'Actual (the recorded side)', priority: 'P0', source: 'GST / trade-licence / Shops & Establishments registrations, aggregated to zones', licence: 'Government data-sharing MoU (aggregates only)', access: 'Authorised government data sharing', unit: 'registered units', frequency: 'Monthly', description: 'Count of active registrations per zone. Counts below the minimum cell size are suppressed.' },
+  { key: 'survey_estimate', name: 'Survey baseline', category: 'official', role: 'Baseline and calibration', priority: 'P0', source: 'ASUSE / Economic Census estimates, modelled to zones', licence: 'MoSPI open data terms', access: 'Public', unit: 'establishments', frequency: 'Annual (FY)', description: 'Annual establishment estimate. Trains the activity nowcast.' },
+  { key: 'night_light', name: 'Night-time lights', category: 'satellite', role: 'Independent activity signal (corroborating only)', priority: 'P0', source: 'VIIRS monthly radiance (NASA Black Marble)', licence: 'NASA open data policy', access: 'Open', unit: 'nW/cm²/sr', frequency: 'Monthly', description: 'Mean radiance. Saturates in dense cores, so it corroborates other signals and never drives a flag alone.' },
+  { key: 'built_up', name: 'Built-up / commercial footprint', category: 'satellite', role: 'Independent activity signal', priority: 'P0', source: 'Sentinel-2 imagery, open building footprints, OpenStreetMap shops and amenities', licence: 'Copernicus open licence; ODbL (OSM)', access: 'Open', unit: '% of zone', frequency: 'Monthly', description: 'Share of the zone classified as built-up commercial surface.' },
+  { key: 'listings', name: 'Hospitality listings', category: 'tourism', role: 'Seasonal activity signal', priority: 'P0', source: 'Goa Tourism Department: registered hotels and homestays', licence: 'Public register', access: 'Public / authorised', unit: 'listings', frequency: 'Monthly', description: 'Hotels, guest houses and homestays active in the month.' },
+  { key: 'footfall', name: 'Tourist footfall', category: 'tourism', role: 'Seasonal activity signal', priority: 'P0', source: 'Goa Tourism Department arrivals, apportioned to zones', licence: 'Public statistics', access: 'Public / authorised', unit: 'visitors / month', frequency: 'Monthly', description: 'Estimated tourist visits. Strongly seasonal; read with the seasonality lens.' },
+  { key: 'power_connections', name: 'Commercial electricity connections', category: 'enrichment', role: 'Enrichment signal', priority: 'P2', source: 'State utility, aggregated by zone and tariff class', licence: 'Only if legally shareable in aggregate', access: 'To be agreed with the utility', unit: 'connections', frequency: 'Monthly', description: 'Optional. Can be switched off under Detection settings.' },
+  { key: 'digital_points', name: 'Merchant payment points', category: 'enrichment', role: 'Enrichment signal', priority: 'P2', source: 'Aggregated, anonymised merchant acceptance-point counts', licence: 'Only if legally shareable in aggregate', access: 'To be agreed with the provider', unit: 'active points', frequency: 'Monthly', description: 'Optional. Counts of acceptance points only: no transactions, no individual data.' },
 ];
 
 export function upsertDatasetCatalog(synthetic = true) {
-  const st = db.prepare(`INSERT INTO datasets (key, name, category, source, unit, frequency, description, synthetic, last_updated)
-    VALUES (?,?,?,?,?,?,?,?, datetime('now'))
-    ON CONFLICT(key) DO UPDATE SET name=excluded.name, category=excluded.category, source=excluded.source, unit=excluded.unit,
-      frequency=excluded.frequency, description=excluded.description`);
-  for (const d of DATASETS) st.run(d.key, d.name, d.category, d.source, d.unit, d.frequency, d.description, synthetic ? 1 : 0);
+  const st = db.prepare(`INSERT INTO datasets (key, name, category, role, priority, source, licence, access, unit, frequency, description, synthetic, last_updated)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
+    ON CONFLICT(key) DO UPDATE SET name=excluded.name, category=excluded.category, role=excluded.role, priority=excluded.priority, source=excluded.source,
+      licence=excluded.licence, access=excluded.access, unit=excluded.unit, frequency=excluded.frequency, description=excluded.description`);
+  for (const d of DATASETS) st.run(d.key, d.name, d.category, d.role, d.priority, d.source, d.licence, d.access, d.unit, d.frequency, d.description, synthetic ? 1 : 0);
 }
 
-const OBS_COLS = ['registered', 'night_light', 'built_up', 'digital_points', 'power_connections', 'listings', 'footfall'];
+// every ingest is versioned with its acquisition date, period and transformation
+export function recordVersion(key, period, records, transformation, acquiredOn) {
+  const v = (get('SELECT MAX(version) v FROM dataset_versions WHERE key = ?', key)?.v || 0) + 1;
+  run('INSERT INTO dataset_versions (key, version, acquired_on, period, records, transformation) VALUES (?,?,?,?,?,?)',
+    key, v, acquiredOn || new Date().toISOString().slice(0, 10), period, records, transformation);
+  run("UPDATE datasets SET version = ?, last_updated = datetime('now') WHERE key = ?", v, key);
+  return v;
+}
+
+export const OBS_COLS = ['registered', 'night_light', 'built_up', 'digital_points', 'power_connections', 'listings', 'footfall'];
 
 export function insertGeneratedMonth(t) {
   const cells = buildCells();
@@ -40,15 +50,18 @@ export function insertGeneratedMonth(t) {
   return label;
 }
 
-// Simulated "continuous monitoring": pull the next month from the (synthetic) source feeds
+// Simulated monthly feed: pull the next month from the (synthetic) sources
 export function ingestNextMonth() {
   const months = listMonths();
   const next = monthIndex(months[months.length - 1]) + 1;
   let label;
   tx(() => {
     label = insertGeneratedMonth(next);
-    run("UPDATE datasets SET last_updated = datetime('now') WHERE synthetic = 1 AND key != 'survey_estimate'");
-    if (label.endsWith('-03')) run("UPDATE datasets SET last_updated = datetime('now') WHERE key = 'survey_estimate'");
+    for (const k of OBS_COLS) {
+      const n = get(`SELECT COUNT(${k}) n FROM observations WHERE month = ?`, label).n;
+      recordVersion(k, label, n, 'Aggregated to the 2.7 km zone grid (synthetic feed)');
+    }
+    if (label.endsWith('-03')) recordVersion('survey_estimate', `FY ${Number(label.slice(0, 4)) - 1}`, get('SELECT COUNT(*) n FROM cells').n, 'Modelled to zones (synthetic)');
   });
   return label;
 }
@@ -78,26 +91,27 @@ export function parseCsv(text) {
 }
 
 // Long format: cell_code, month (YYYY-MM), metric, value
-// metric may be any observation column or survey_estimate (month = FY start, e.g. 2025-04)
-export function importObservationsCsv(text) {
-  const rows = parseCsv(text);
-  if (!rows.length) throw new Error('File is empty');
+// metric may be any observation column or survey_estimate (month = FY start, e.g. 2025-04).
+// Only zone-level aggregates are accepted; values that are not supplied stay missing.
+export function importObservationsCsv(text, filename = 'upload') {
+  const rows = parseCsv(text.replace(/^﻿/, ''));
+  if (!rows.length) throw Object.assign(new Error('File is empty'), { status: 400 });
   const header = rows[0].map((h) => h.trim().toLowerCase());
-  const col = (n) => header.indexOf(n);
-  const [ci, mi, ki, vi] = ['cell_code', 'month', 'metric', 'value'].map(col);
-  if ([ci, mi, ki, vi].some((x) => x < 0)) throw new Error('Header must contain: cell_code, month, metric, value');
+  const [ci, mi, ki, vi] = ['cell_code', 'month', 'metric', 'value'].map((n) => header.indexOf(n));
+  if ([ci, mi, ki, vi].some((x) => x < 0)) throw Object.assign(new Error('Header must contain: cell_code, month, metric, value'), { status: 400 });
   const ids = new Map(all('SELECT id, code FROM cells').map((r) => [r.code, r.id]));
   const errors = [];
   let accepted = 0;
-  const touched = new Set();
+  const touched = {};
   tx(() => {
     for (let r = 1; r < rows.length; r++) {
       const line = rows[r];
-      const code = line[ci]?.trim(), month = line[mi]?.trim(), metric = line[ki]?.trim().toLowerCase(), value = Number(line[vi]);
+      const code = line[ci]?.trim(), month = line[mi]?.trim(), metric = line[ki]?.trim().toLowerCase(), rawValue = line[vi]?.trim();
+      const value = Number(rawValue);
       const bad = (msg) => errors.length < 50 && errors.push(`Row ${r + 1}: ${msg}`);
       if (!ids.has(code)) { bad(`unknown cell_code "${code}"`); continue; }
-      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) { bad(`month must be YYYY-MM, got "${month}"`); continue; }
-      if (!Number.isFinite(value) || value < 0) { bad(`value must be a non-negative number`); continue; }
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month || '')) { bad(`month must be YYYY-MM, got "${month}"`); continue; }
+      if (rawValue === '' || rawValue === undefined || !Number.isFinite(value) || value < 0) { bad('value must be a non-negative number'); continue; }
       const id = ids.get(code);
       if (metric === 'survey_estimate') {
         run('INSERT OR REPLACE INTO surveys (cell_id, fy_start, estimate) VALUES (?,?,?)', id, Number(month.slice(0, 4)), value);
@@ -105,14 +119,15 @@ export function importObservationsCsv(text) {
         run('INSERT OR IGNORE INTO observations (cell_id, month) VALUES (?, ?)', id, month);
         run(`UPDATE observations SET ${metric} = ? WHERE cell_id = ? AND month = ?`, value, id, month);
       } else { bad(`unknown metric "${metric}"`); continue; }
-      touched.add(metric); accepted++;
+      (touched[metric] ||= { n: 0, months: new Set() }).n++;
+      touched[metric].months.add(month);
+      accepted++;
     }
-    // back-fill any columns left NULL on freshly created rows from the previous month
-    for (const c of OBS_COLS) {
-      run(`UPDATE observations SET ${c} = (SELECT o2.${c} FROM observations o2 WHERE o2.cell_id = observations.cell_id
-           AND o2.month < observations.month AND o2.${c} IS NOT NULL ORDER BY o2.month DESC LIMIT 1) WHERE ${c} IS NULL`);
+    for (const [k, v] of Object.entries(touched)) {
+      const ms = [...v.months].sort();
+      recordVersion(k, ms.length > 1 ? `${ms[0]} … ${ms[ms.length - 1]}` : ms[0], v.n, `CSV upload: ${filename}`);
+      run('UPDATE datasets SET synthetic = 0 WHERE key = ?', k);
     }
-    for (const k of touched) run("UPDATE datasets SET last_updated = datetime('now'), synthetic = 0 WHERE key = ?", k);
   });
-  return { accepted, rejected: rows.length - 1 - accepted, errors, metrics: [...touched] };
+  return { accepted, rejected: rows.length - 1 - accepted, errors, metrics: Object.keys(touched) };
 }

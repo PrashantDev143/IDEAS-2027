@@ -212,6 +212,13 @@ export function buildCells() {
         taluka: nearest.taluka, district: TALUKAS[nearest.taluka],
         nearest: nearest.name, nearestKm: nd, zone,
         tourism_share: +tour.toFixed(3),
+        // structural traits used for peer grouping (never registration data)
+        dist_centre_km: +Math.min(...LOCALITIES.filter((l) => l.type === 'urban' && l.a >= 600).map((l) => distKm(clat, clon, l.lat, l.lon))).toFixed(2),
+        road_access: +Math.min(1, 0.12 + 0.2 * Math.log10(1 + total) + 0.12 * rand(code, 'rd')).toFixed(3),
+        // informal settlement / insecure tenure marker: field visits need senior sign-off
+        sensitive: zone === 'urban' && total > 250 && rand(code, 'sens') < 0.07 ? 1 : 0,
+        // patchy source coverage (cloud cover, feeds not yet onboarded)
+        _patchy: (forestish && rand(code, 'pt') < 0.45) || (zone === 'rural' && rand(code, 'pt') < 0.07),
         _contribs: contribs, _rural: rural,
         _nlSpike: contribs.some((c) => c.loc.nlSpike && c.w > 0.4 * total),
       });
@@ -259,7 +266,7 @@ export function generateMonth(cell, t) {
   const listings = cell.tourism_share * A * 0.35 * Math.sqrt(season) * lognoise(0.12, id, t, 'ls');
   const footfall = cell.tourism_share * A * 28 * season * lognoise(0.12, id, t, 'ff');
   const registered = registeredBase(cell, t) * lognoise(0.05, id, t, 'rg');
-  return {
+  const out = {
     registered: Math.round(registered),
     night_light: +nl.toFixed(2),
     built_up: +built.toFixed(1),
@@ -268,6 +275,14 @@ export function generateMonth(cell, t) {
     listings: Math.round(listings),
     footfall: Math.round(footfall),
   };
+  if (cell._patchy) {
+    // missing values stay missing (NULL): the engine lowers confidence, it never imputes silently
+    const monsoon = m >= 6 && m <= 9;
+    const miss = (k, p) => { if (rand(id, t, 'miss', k) < p) out[k] = null; };
+    miss('night_light', monsoon ? 0.85 : 0.25); miss('built_up', monsoon ? 0.85 : 0.25);
+    miss('digital_points', 0.7); miss('power_connections', 0.45); miss('listings', 0.4); miss('footfall', 0.4);
+  }
+  return out;
 }
 
 // Annual (FY Apr–Mar) survey estimate, ASUSE-style, modelled to cell level.
